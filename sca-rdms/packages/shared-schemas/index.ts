@@ -33,3 +33,13 @@ export const resetPasswordSchema = z.object({
   newPassword: passwordPolicy,
 });
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
+export const verifyEmailSchema = z.object({
+  token: z.string().min(1),
+});
+export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
+
+export const requestEmailVerificationSchema = z.object({
+  email: z.string().email(),
+});
+export type RequestEmailVerificationInput = z.infer<typeof requestEmailVerificationSchema>;

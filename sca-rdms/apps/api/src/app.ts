@@ -9,7 +9,8 @@ import { errorHandler, notFoundHandler } from "./middleware/error-handler";
 
 // Feature route modules are added incrementally starting Phase 3
 // (auth) and Phase 4 (reports, documents, files, search, ...).
-// import { authRouter } from "./modules/auth/auth.routes";
+import { authRouter } from "./modules/auth/auth.routes";
+import { usersRouter } from "./modules/users/users.routes";
 
 export function createApp() {
   const app = express();
@@ -53,11 +54,12 @@ export function createApp() {
     res.status(200).json({
       name: "SCA Report & Document Management System API",
       version: "v1",
-      status: "Phase 2 — foundation only; feature routes land in Phase 3+",
+      status: "Phase 3 — auth + RBAC; report/document routes land in Phase 4+",
     });
   });
 
-  // Phase 3+: app.use("/api/v1/auth", authRouter); etc.
+  app.use("/api/v1/auth", authRouter);
+  app.use("/api/v1/users", usersRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
