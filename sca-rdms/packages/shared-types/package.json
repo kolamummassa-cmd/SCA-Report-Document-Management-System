@@ -1,0 +1,8 @@
+{
+  "name": "@sca-rdms/shared-types",
+  "private": true,
+  "version": "0.1.0",
+  "description": "TypeScript types shared between the web frontend and the API backend.",
+  "main": "index.ts",
+  "types": "index.ts"
+}

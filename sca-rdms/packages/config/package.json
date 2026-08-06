@@ -1,0 +1,6 @@
+{
+  "name": "@sca-rdms/config",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Shared TypeScript/ESLint/Prettier configuration for all workspace packages."
+}

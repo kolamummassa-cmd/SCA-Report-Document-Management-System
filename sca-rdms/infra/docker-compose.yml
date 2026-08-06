@@ -1,0 +1,55 @@
+name: sca-rdms
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sca_admin
+      POSTGRES_PASSWORD: changeme
+      POSTGRES_DB: sca_rdms
+    ports:
+      - "5433:5432" # host 5433 -> container 5432 (5432 was already in use on the host)
+    volumes:
+      - sca_rdms_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sca_admin -d sca_rdms"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - sca_rdms_redis_data:/data
+
+  # S3-compatible object storage for local development, so upload/download
+  # code paths behave the same locally as they will against Cloudflare R2 / AWS S3.
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: sca_minio_admin
+      MINIO_ROOT_PASSWORD: changeme123
+    ports:
+      - "9000:9000" # API
+      - "9001:9001" # Console
+    volumes:
+      - sca_rdms_minio_data:/data
+
+  # Local SMTP catcher for testing email notifications without sending real mail.
+  mailhog:
+    image: mailhog/mailhog:latest
+    restart: unless-stopped
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # Web UI
+
+volumes:
+  sca_rdms_postgres_data:
+  sca_rdms_redis_data:
+  sca_rdms_minio_data:

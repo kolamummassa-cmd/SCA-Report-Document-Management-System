@@ -1,0 +1,9 @@
+{
+  "name": "@sca-rdms/web",
+  "private": true,
+  "version": "0.1.0",
+  "description": "SCA Report & Document Management System — Next.js frontend. Scaffolded in full during Phase 5 (Frontend Foundation & Design System) per the Development Roadmap.",
+  "scripts": {
+    "dev": "echo 'Frontend build begins in Phase 5 — see 2026-08-07-sca-development-roadmap.md' && exit 0"
+  }
+}

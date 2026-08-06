@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Env files — never commit secrets
+.env
+.env.local
+.env.*.local
+
+# Build output
+dist/
+build/
+.next/
+out/
+
+# Prisma
+apps/api/node_modules/
+
+# Uploads / local storage (dev)
+uploads/
+backups/
+
+# Logs
+*.log
+npm-debug.log*
+server.log
+
+# Editor/OS
+.DS_Store
+.vscode/
+.idea/
+
+# Test/coverage
+coverage/
+.turbo/
+
+# Docker volumes are managed by Docker itself, not files on disk here

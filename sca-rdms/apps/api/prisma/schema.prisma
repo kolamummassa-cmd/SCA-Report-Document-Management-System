@@ -1,0 +1,536 @@
+// SCA Report & Document Management System
+// Prisma schema — Phase 2 (generated from the Phase 1 Database ER Diagram)
+//
+// NOTE ON FULL-TEXT SEARCH:
+// `searchVector` fields use Postgres `tsvector`, which Prisma Client cannot
+// read/write natively. They are declared as `Unsupported("tsvector")` so
+// migrations still create the column; population happens via a trigger
+// defined in a hand-written follow-up migration
+// (see migrations/20260806230800_add_search_vector_triggers) since Prisma's
+// migration engine has no concept of triggers/functions.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────
+
+enum ReportCadence {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  ANNUAL
+  AD_HOC
+}
+
+enum ReportStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  ARCHIVED
+}
+
+enum ApprovalDecision {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum DocumentStatus {
+  ACTIVE
+  ARCHIVED
+  DELETED
+}
+
+enum NotificationType {
+  REPORT_SUBMITTED
+  REPORT_APPROVED
+  REPORT_REJECTED
+  DEADLINE_REMINDER
+  DOCUMENT_SHARED
+  SYSTEM
+}
+
+enum StorageProvider {
+  LOCAL
+  S3
+  R2
+}
+
+// ─────────────────────────────────────────────────────────────
+// RBAC
+// ─────────────────────────────────────────────────────────────
+
+model Role {
+  id           String           @id @default(uuid())
+  name         String           @unique
+  description  String?
+  isSystemRole Boolean          @default(false)
+  users        User[]
+  permissions  RolePermission[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id @default(uuid())
+  resource    String // e.g. "report", "document", "user"
+  action      String // e.g. "create", "read", "update", "delete", "approve"
+  description String?
+  roles       RolePermission[]
+
+  @@unique([resource, action])
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String     @id @default(uuid())
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model Session {
+  id               String    @id @default(uuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenHash String
+  deviceInfo       String?
+  ipAddress        String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Organization structure
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id                  String    @id @default(uuid())
+  firstName           String
+  lastName            String
+  email               String    @unique
+  passwordHash        String
+  phone               String?
+  roleId              String
+  role                Role      @relation(fields: [roleId], references: [id])
+  departmentId        String?
+  department          Department? @relation(fields: [departmentId], references: [id])
+  isEmailVerified     Boolean   @default(false)
+  isActive            Boolean   @default(true)
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  lastLoginAt         DateTime?
+
+  preparedReports     Report[]        @relation("ReportPreparedBy")
+  supervisedReports   Report[]        @relation("ReportSupervisor")
+  authoredDocuments   Document[]
+  approvals           Approval[]
+  comments            Comment[]
+  notifications       Notification[]
+  activityLogs        ActivityLog[]
+  auditLogs           AuditLog[]
+  sessions            Session[]
+  uploadedFiles       File[]
+  reportRevisions     ReportRevision[]
+  documentVersions    DocumentVersion[]
+  headedDepartments   Department[]    @relation("DepartmentHead")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([roleId])
+  @@index([departmentId])
+  @@map("users")
+}
+
+model Department {
+  id          String      @id @default(uuid())
+  name        String      @unique
+  description String?
+  headUserId  String?
+  head        User?       @relation("DepartmentHead", fields: [headUserId], references: [id])
+  users       User[]
+  programmes  Programme[]
+  reports     Report[]
+  documents   Document[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("departments")
+}
+
+model Programme {
+  id           String     @id @default(uuid())
+  name         String
+  description  String?
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  status       String     @default("ACTIVE")
+  projects     Project[]
+  reports      Report[]
+  documents    Document[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([departmentId])
+  @@map("programmes")
+}
+
+model Project {
+  id               String     @id @default(uuid())
+  name             String
+  description      String?
+  programmeId      String
+  programme        Programme  @relation(fields: [programmeId], references: [id])
+  status           String     @default("ACTIVE")
+  startDate        DateTime?
+  endDate          DateTime?
+  budgetAllocated  Decimal?   @db.Decimal(14, 2)
+  reports          Report[]
+  documents        Document[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([programmeId])
+  @@map("projects")
+}
+
+model Location {
+  id        String   @id @default(uuid())
+  country   String
+  region    String?
+  county    String?
+  subCounty String?
+  ward      String?
+  latitude  Decimal? @db.Decimal(9, 6)
+  longitude Decimal? @db.Decimal(9, 6)
+  reports   Report[]
+  documents Document[]
+
+  @@index([country, county])
+  @@map("locations")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Reports
+// ─────────────────────────────────────────────────────────────
+
+model ReportType {
+  id                    String        @id @default(uuid())
+  name                  String        @unique
+  cadence               ReportCadence
+  approvalChainTemplate Json // ordered list of role names/steps
+  reports               Report[]
+
+  @@map("report_types")
+}
+
+model Report {
+  id             String       @id @default(uuid())
+  reportNumber   String       @unique
+  title          String
+  reportTypeId   String
+  reportType     ReportType   @relation(fields: [reportTypeId], references: [id])
+  programmeId    String?
+  programme      Programme?   @relation(fields: [programmeId], references: [id])
+  projectId      String?
+  project        Project?     @relation(fields: [projectId], references: [id])
+  departmentId   String?
+  department     Department?  @relation(fields: [departmentId], references: [id])
+  periodStart    DateTime
+  periodEnd      DateTime
+  locationId     String?
+  location       Location?    @relation(fields: [locationId], references: [id])
+  preparedById   String
+  preparedBy     User         @relation("ReportPreparedBy", fields: [preparedById], references: [id])
+  supervisorId   String?
+  supervisor     User?        @relation("ReportSupervisor", fields: [supervisorId], references: [id])
+
+  executiveSummary    String?
+  objectives          String?
+  activitiesConducted String?
+  achievements        String?
+  challenges          String?
+  lessonsLearned      String?
+  recommendations     String?
+  nextSteps           String?
+
+  beneficiariesMale     Int @default(0)
+  beneficiariesFemale   Int @default(0)
+  beneficiariesChildren Int @default(0)
+  beneficiariesAdults   Int @default(0)
+  beneficiariesPWD      Int @default(0)
+
+  budgetAllocated Decimal? @db.Decimal(14, 2)
+  budgetUsed      Decimal? @db.Decimal(14, 2)
+  budgetRemaining Decimal? @db.Decimal(14, 2)
+
+  digitalSignature String?
+  status           ReportStatus @default(DRAFT)
+  isSensitive      Boolean      @default(false)
+
+  // Full-text search column — see migration.sql for GIN index + trigger.
+  searchVector Unsupported("tsvector")?
+
+  revisions ReportRevision[]
+  approvals Approval[]
+  comments  Comment[]
+  files     File[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([reportTypeId])
+  @@index([programmeId])
+  @@index([projectId])
+  @@index([departmentId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([searchVector], type: Gin)
+  @@map("reports")
+}
+
+model ReportRevision {
+  id            String   @id @default(uuid())
+  reportId      String
+  report        Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  versionNumber Int
+  snapshot      Json
+  changedById   String
+  changedBy     User     @relation(fields: [changedById], references: [id])
+  createdAt     DateTime @default(now())
+
+  @@unique([reportId, versionNumber])
+  @@map("report_revisions")
+}
+
+model Approval {
+  id         String           @id @default(uuid())
+  reportId   String
+  report     Report           @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  stepOrder  Int
+  approverId String
+  approver   User             @relation(fields: [approverId], references: [id])
+  decision   ApprovalDecision @default(PENDING)
+  remarks    String?
+  decidedAt  DateTime?
+  createdAt  DateTime         @default(now())
+
+  @@index([reportId])
+  @@map("approvals")
+}
+
+model Comment {
+  id         String    @id @default(uuid())
+  authorId   String
+  author     User      @relation(fields: [authorId], references: [id])
+  reportId   String?
+  report     Report?   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  documentId String?
+  document   Document? @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  body       String
+  createdAt  DateTime  @default(now())
+
+  @@index([reportId])
+  @@index([documentId])
+  @@map("comments")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Documents
+// ─────────────────────────────────────────────────────────────
+
+model Document {
+  id             String         @id @default(uuid())
+  title          String
+  documentType   String // e.g. "Policy", "Training Manual", "Success Story"
+  authorId       String
+  author         User           @relation(fields: [authorId], references: [id])
+  programmeId    String?
+  programme      Programme?     @relation(fields: [programmeId], references: [id])
+  projectId      String?
+  project        Project?       @relation(fields: [projectId], references: [id])
+  departmentId   String?
+  department     Department?    @relation(fields: [departmentId], references: [id])
+  locationId     String?
+  location       Location?      @relation(fields: [locationId], references: [id])
+  year           Int
+  description    String?
+  status         DocumentStatus @default(ACTIVE)
+  isSensitive    Boolean        @default(false)
+
+  searchVector Unsupported("tsvector")?
+
+  categories Category[] @relation("DocumentCategories")
+  tags       Tag[]      @relation("DocumentTags")
+  versions   DocumentVersion[]
+  files      File[]
+  comments   Comment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([documentType])
+  @@index([programmeId])
+  @@index([projectId])
+  @@index([departmentId])
+  @@index([year])
+  @@index([status])
+  @@index([searchVector], type: Gin)
+  @@map("documents")
+}
+
+model DocumentVersion {
+  id            String   @id @default(uuid())
+  documentId    String
+  document      Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  versionNumber Int
+  fileId        String   @unique
+  file          File     @relation(fields: [fileId], references: [id])
+  uploadedById  String
+  uploadedBy    User     @relation(fields: [uploadedById], references: [id])
+  changeNote    String?
+  createdAt     DateTime @default(now())
+
+  @@unique([documentId, versionNumber])
+  @@map("document_versions")
+}
+
+model File {
+  id               String           @id @default(uuid())
+  originalName     String
+  storageKey       String           @unique
+  mimeType         String
+  sizeBytes        BigInt
+  checksumSha256   String
+  storageProvider  StorageProvider  @default(LOCAL)
+  uploadedById     String
+  uploadedBy       User             @relation(fields: [uploadedById], references: [id])
+  reportId         String?
+  report           Report?          @relation(fields: [reportId], references: [id])
+  documentId       String?
+  document         Document?        @relation(fields: [documentId], references: [id])
+  documentVersion  DocumentVersion?
+
+  createdAt DateTime @default(now())
+
+  @@index([reportId])
+  @@index([documentId])
+  @@map("files")
+}
+
+model Category {
+  id               String     @id @default(uuid())
+  name             String     @unique
+  parentCategoryId String?
+  parentCategory   Category?  @relation("CategoryHierarchy", fields: [parentCategoryId], references: [id])
+  subCategories    Category[] @relation("CategoryHierarchy")
+  documents        Document[] @relation("DocumentCategories")
+
+  @@map("categories")
+}
+
+model Tag {
+  id        String     @id @default(uuid())
+  name      String     @unique
+  documents Document[] @relation("DocumentTags")
+
+  @@map("tags")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Notifications, Logging, Settings
+// ─────────────────────────────────────────────────────────────
+
+model Notification {
+  id         String            @id @default(uuid())
+  userId     String
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       NotificationType
+  title      String
+  body       String?
+  isRead     Boolean           @default(false)
+  reportId   String?
+  documentId String?
+  createdAt  DateTime          @default(now())
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+model ActivityLog {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  action     String
+  entityType String
+  entityId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@map("activity_logs")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  action      String
+  entityType  String
+  entityId    String?
+  ipAddress   String?
+  userAgent   String?
+  beforeState Json?
+  afterState  Json?
+  createdAt   DateTime @default(now())
+
+  @@index([entityType, entityId, createdAt])
+  @@index([userId])
+  @@map("audit_logs")
+}
+
+model Setting {
+  id    String @id @default(uuid())
+  key   String @unique
+  value Json
+
+  @@map("settings")
+}
+
+model OrganizationProfile {
+  id                  String  @id @default(uuid())
+  name                String
+  mission             String?
+  vision              String?
+  logoUrl             String?
+  email               String?
+  phone               String?
+  registrationDetails String?
+
+  @@map("organization_profile")
+}

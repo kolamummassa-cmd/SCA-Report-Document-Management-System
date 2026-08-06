@@ -1,0 +1,11 @@
+{
+  "name": "@sca-rdms/shared-schemas",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Zod validation schemas shared between React Hook Form (client) and Express middleware (server).",
+  "main": "index.ts",
+  "types": "index.ts",
+  "dependencies": {
+    "zod": "^3.23.8"
+  }
+}
