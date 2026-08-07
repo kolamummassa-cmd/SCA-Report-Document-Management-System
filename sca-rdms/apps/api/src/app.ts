@@ -3,6 +3,9 @@ import helmet from "helmet";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
+import swaggerUi from "swagger-ui-express";
+import YAML from "yamljs";
+import path from "path";
 import { env, corsAllowedOrigins } from "./config/env";
 import { requestLogger } from "./middleware/request-logger";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler";
@@ -11,6 +14,9 @@ import { errorHandler, notFoundHandler } from "./middleware/error-handler";
 // (auth) and Phase 4 (reports, documents, files, search, ...).
 import { authRouter } from "./modules/auth/auth.routes";
 import { usersRouter } from "./modules/users/users.routes";
+import { reportsRouter } from "./modules/reports/reports.routes";
+import { documentsRouter } from "./modules/documents/documents.routes";
+import { filesRouter } from "./modules/files/files.routes";
 
 export function createApp() {
   const app = express();
@@ -54,12 +60,20 @@ export function createApp() {
     res.status(200).json({
       name: "SCA Report & Document Management System API",
       version: "v1",
-      status: "Phase 3 — auth + RBAC; report/document routes land in Phase 4+",
+      status: "Phase 4 — reports, documents, and file storage online",
+      docs: "/api/v1/docs",
     });
   });
 
+  // OpenAPI docs — scaffolded starting Phase 4, grows with each new module.
+  const openApiDocument = YAML.load(path.join(__dirname, "..", "openapi.yaml"));
+  app.use("/api/v1/docs", swaggerUi.serve, swaggerUi.setup(openApiDocument));
+
   app.use("/api/v1/auth", authRouter);
   app.use("/api/v1/users", usersRouter);
+  app.use("/api/v1/reports", reportsRouter);
+  app.use("/api/v1/documents", documentsRouter);
+  app.use("/api/v1/files", filesRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

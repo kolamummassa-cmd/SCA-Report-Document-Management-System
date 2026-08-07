@@ -5,6 +5,7 @@
  * export generation, thumbnailing) under `src/jobs/`.
  */
 
+import "./lib/bigint-json";
 import { env } from "./config/env";
 import { logger } from "./lib/logger";
 import { prisma } from "./lib/prisma";

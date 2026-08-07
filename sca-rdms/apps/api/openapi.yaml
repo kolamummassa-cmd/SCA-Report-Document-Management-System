@@ -1,0 +1,340 @@
+openapi: 3.0.3
+info:
+  title: SCA Report & Document Management System API
+  description: >
+    Central API for the SCA Report & Document Management System.
+    Scaffolded in Phase 4 and expanded with every subsequent module
+    (analytics, notifications, calendar, audit log, settings).
+  version: "0.4.0"
+servers:
+  - url: /api/v1
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+security:
+  - bearerAuth: []
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Sign in with email + password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        "200": { description: Access token + refresh cookie issued }
+        "401": { description: Invalid credentials }
+        "423": { description: Account locked }
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Exchange the refresh cookie for a new access token
+      responses:
+        "200": { description: New access token issued }
+        "401": { description: No valid session }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoke the current session
+      responses:
+        "200": { description: Logged out }
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Request a password reset email
+      responses:
+        "200": { description: Generic acknowledgement (does not reveal account existence) }
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Reset password using a token from the reset email
+      responses:
+        "200": { description: Password updated }
+
+  /auth/verify-email:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Verify email using a token from the verification email
+      responses:
+        "200": { description: Email verified }
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Current authenticated user's profile
+      responses:
+        "200": { description: User profile }
+
+  /users:
+    get:
+      tags: [Users]
+      summary: List all users (requires user:read permission)
+      responses:
+        "200": { description: List of users }
+        "403": { description: Insufficient permission }
+
+  /reports:
+    post:
+      tags: [Reports]
+      summary: Create a draft report (requires report:create)
+      responses:
+        "201": { description: Report created }
+    get:
+      tags: [Reports]
+      summary: List reports, filtered by role scope (requires report:read)
+      parameters:
+        - in: query
+          name: status
+          schema: { type: string, enum: [DRAFT, SUBMITTED, APPROVED, REJECTED, ARCHIVED] }
+        - in: query
+          name: page
+          schema: { type: integer }
+        - in: query
+          name: pageSize
+          schema: { type: integer }
+      responses:
+        "200": { description: Paginated report list }
+
+  /reports/{id}:
+    get:
+      tags: [Reports]
+      summary: Get a single report with approvals/comments/files
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Report detail }
+        "404": { description: Not found }
+    patch:
+      tags: [Reports]
+      summary: Update a draft or rejected report (author only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Updated report }
+
+  /reports/{id}/submit:
+    post:
+      tags: [Reports]
+      summary: Submit a report — snapshots a revision and starts the approval chain
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Report submitted }
+
+  /reports/{id}/approve:
+    post:
+      tags: [Reports]
+      summary: Approve the current pending step (requires report:approve)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Approval recorded; report advances or finalizes }
+
+  /reports/{id}/reject:
+    post:
+      tags: [Reports]
+      summary: Reject the report at the current step (requires report:reject)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Report rejected, returns to Draft-editable state }
+
+  /reports/{id}/revisions:
+    get:
+      tags: [Reports]
+      summary: Full immutable revision history for a report
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: List of revisions }
+
+  /reports/{id}/comments:
+    post:
+      tags: [Reports]
+      summary: Add a comment to a report
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "201": { description: Comment created }
+
+  /reports/{id}/attachments:
+    post:
+      tags: [Reports]
+      summary: Attach a supporting file to a report (multipart/form-data, field "file")
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "201": { description: File stored and attached }
+
+  /documents:
+    post:
+      tags: [Documents]
+      summary: Upload a new document (multipart/form-data, field "file" + metadata)
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+                title: { type: string }
+                documentType: { type: string }
+                year: { type: integer }
+                tags: { type: string, description: "comma-separated" }
+                categories: { type: string, description: "comma-separated" }
+      responses:
+        "201": { description: Document created with version 1 }
+    get:
+      tags: [Documents]
+      summary: List/filter documents (requires document:read)
+      parameters:
+        - in: query
+          name: documentType
+          schema: { type: string }
+        - in: query
+          name: year
+          schema: { type: integer }
+      responses:
+        "200": { description: Paginated document list }
+
+  /documents/{id}:
+    get:
+      tags: [Documents]
+      summary: Get a document with full version history
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Document detail }
+    delete:
+      tags: [Documents]
+      summary: Soft-delete a document (requires document:delete)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Document marked deleted }
+
+  /documents/{id}/versions:
+    post:
+      tags: [Documents]
+      summary: Upload a new version of an existing document
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+                changeNote: { type: string }
+      responses:
+        "201": { description: New version added }
+
+  /documents/{id}/restore:
+    post:
+      tags: [Documents]
+      summary: Restore a soft-deleted document
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Document restored }
+
+  /documents/{id}/comments:
+    post:
+      tags: [Documents]
+      summary: Add a comment to a document
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "201": { description: Comment created }
+
+  /files/{id}/download:
+    get:
+      tags: [Files]
+      summary: Download a stored file (audit-logged)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: File bytes
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "404": { description: Not found }

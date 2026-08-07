@@ -38,9 +38,9 @@ export const authController = {
       }
       const result = await authService.refresh(presented, requestContext(req));
       res.cookie(REFRESH_COOKIE_NAME, result.refreshToken, cookieOptions());
-      res.status(200).json({ data: { accessToken: result.accessToken } });
+      return res.status(200).json({ data: { accessToken: result.accessToken } });
     } catch (err) {
-      next(err);
+      return next(err);
     }
   },
 
@@ -98,7 +98,7 @@ export const authController = {
       if (!user) {
         return res.status(404).json({ error: { code: "NOT_FOUND", message: "User not found." } });
       }
-      res.status(200).json({
+      return res.status(200).json({
         data: {
           id: user.id,
           firstName: user.firstName,
@@ -110,7 +110,7 @@ export const authController = {
         },
       });
     } catch (err) {
-      next(err);
+      return next(err);
     }
   },
 };
