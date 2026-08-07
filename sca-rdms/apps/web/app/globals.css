@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  SCA design tokens — see 2026-08-07-sca-ui-design-plan.md, section 2
+  ("Brand & Color System"). Light mode is the default; `.dark` overrides
+  the same variable names so components never need theme-aware branching.
+*/
+:root {
+  --color-primary: #1b7a43;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #1d5fa6;
+  --color-secondary-foreground: #ffffff;
+  --color-background: #ffffff;
+  --color-surface: #f7f9f8;
+  --color-surface-muted: #eef2f0;
+  --color-border: #e2e8e5;
+  --color-foreground: #111827;
+  --color-muted-foreground: #5b6b63;
+  --color-success: #1b7a43;
+  --color-warning: #b7791f;
+  --color-destructive: #b3261e;
+  --color-info: #1d5fa6;
+
+  /* Pre-mixed tint backgrounds for badges/banners. Defined explicitly per
+     theme (rather than relying on Tailwind's opacity modifier against a
+     CSS-variable color, which isn't reliably supported) so `bg-success-soft`
+     etc. just work as plain, portable Tailwind color tokens. */
+  --color-primary-soft: #e6f4ec;
+  --color-success-soft: #e6f4ec;
+  --color-warning-soft: #faf1e0;
+  --color-destructive-soft: #fbe9e8;
+  --color-info-soft: #e6eef8;
+}
+
+.dark {
+  --color-primary: #3fae6a;
+  --color-primary-foreground: #062412;
+  --color-secondary: #5b9be0;
+  --color-secondary-foreground: #04182c;
+  --color-background: #0f1a17;
+  --color-surface: #16221e;
+  --color-surface-muted: #1c2924;
+  --color-border: #28362f;
+  --color-foreground: #e7eeea;
+  --color-muted-foreground: #9aaca3;
+  --color-success: #3fae6a;
+  --color-warning: #e0a83f;
+  --color-destructive: #e5534b;
+  --color-info: #5b9be0;
+
+  --color-primary-soft: #1c2924;
+  --color-success-soft: #1c2924;
+  --color-warning-soft: #2b2416;
+  --color-destructive-soft: #2c1917;
+  --color-info-soft: #182231;
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+}
